@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "scripts": {
     "detect": ".venv/bin/python detect.py",
-    "downscale": ".venv/bin/python downscale.py"
+    "downscale": ".venv/bin/python downscale.py",
+    "rename": ".venv/bin/python rename.py"
   }
 }
