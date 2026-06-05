@@ -1,6 +1,8 @@
 {
   "name": "drop-detector",
+  "version": "1.0.0",
   "scripts": {
-    "detect": ".venv/bin/python detect.py"
+    "detect": ".venv/bin/python detect.py",
+    "downscale": ".venv/bin/python downscale.py"
   }
 }

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Drop Detector - Detecta los mejores momentos (drops) en DJ sets
-y genera clips de video recortados.
+Drop Detector - Detects the best moments (drops) in DJ sets
+and generates trimmed video clips.
 
-Uso:
-    1. Colocar videos MP4 en la carpeta input/
-    2. Ejecutar: python detect.py
-    3. Los clips se generan en output/
+Usage:
+    1. Place video files in the input/ folder
+    2. Run: python detect.py
+    3. Clips are generated in output/
 """
 
 import os
@@ -18,19 +18,19 @@ import subprocess
 import numpy as np
 import librosa
 
-# --- Parámetros configurables ---
-CLIP_BEFORE = 2        # Segundos antes del drop a incluir en el clip
-CLIP_AFTER = 28        # Segundos después del drop a incluir en el clip
-MIN_DROP_DISTANCE = 30 # Distancia mínima entre drops (segundos)
-ENERGY_THRESHOLD = 85  # Percentil para considerar un pico de energía como drop
+# --- Configurable parameters ---
+CLIP_BEFORE = 2        # Seconds before the drop to include in the clip
+CLIP_AFTER = 28        # Seconds after the drop to include in the clip
+MIN_DROP_DISTANCE = 30 # Minimum distance between drops (seconds)
+ENERGY_THRESHOLD = 85  # Percentile to consider an energy peak as a drop
 
 INPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "input")
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
 
 
 def extract_audio(video_path: str, audio_path: str) -> None:
-    """Extrae el audio de un video MP4 a WAV mono 22050Hz."""
-    print(f"  Extrayendo audio de {os.path.basename(video_path)}...")
+    """Extract audio from a video file to mono WAV at 22050Hz."""
+    print(f"  Extracting audio from {os.path.basename(video_path)}...")
     subprocess.run(
         [
             "ffmpeg", "-y", "-i", video_path,
@@ -45,36 +45,36 @@ def extract_audio(video_path: str, audio_path: str) -> None:
 
 def detect_drops(audio_path: str) -> list[float]:
     """
-    Analiza el audio y detecta los momentos de mayor energía.
+    Analyze audio and detect high-energy moments.
 
-    Detecta picos de energía absoluta, no solo transiciones buildup→drop.
-    Esto captura también drops encadenados donde el DJ no baja la energía.
+    Detects absolute energy peaks, not just buildup-to-drop transitions.
+    This also captures chained drops where the DJ doesn't lower the energy.
 
-    Retorna una lista de timestamps (en segundos) donde ocurren los drops.
+    Returns a list of timestamps (in seconds) where drops occur.
     """
-    print("  Cargando audio...")
+    print("  Loading audio...")
     y, sr = librosa.load(audio_path, sr=22050)
 
-    print("  Analizando energía...")
+    print("  Analyzing energy...")
     hop_length = 2048
     rms = librosa.feature.rms(y=y, frame_length=4096, hop_length=hop_length)[0]
 
-    # Suavizar la curva de energía (~1 segundo de ventana)
+    # Smooth the energy curve (~1 second window)
     kernel_size = 11
     kernel = np.ones(kernel_size) / kernel_size
     rms_smooth = np.convolve(rms, kernel, mode="same")
 
-    # Umbral: frames con energía por encima del percentil configurado
+    # Threshold: frames with energy above the configured percentile
     threshold = np.percentile(rms_smooth, ENERGY_THRESHOLD)
     high_energy_frames = np.where(rms_smooth > threshold)[0]
 
     if len(high_energy_frames) == 0:
         return []
 
-    # Convertir frames a segundos
+    # Convert frames to seconds
     times = librosa.frames_to_time(high_energy_frames, sr=sr, hop_length=hop_length)
 
-    # Agrupar detecciones cercanas y quedarse con el pico de mayor energía
+    # Group nearby detections and keep the peak with highest energy
     drops = []
     group_start = 0
     for i in range(1, len(times)):
@@ -84,7 +84,7 @@ def detect_drops(audio_path: str) -> list[float]:
             drops.append(times[best_idx])
             group_start = i
 
-    # Último grupo
+    # Last group
     group_frames = high_energy_frames[group_start:]
     best_idx = group_start + np.argmax(rms_smooth[group_frames])
     drops.append(times[best_idx])
@@ -93,14 +93,14 @@ def detect_drops(audio_path: str) -> list[float]:
 
 
 def format_timestamp(seconds: float) -> str:
-    """Formatea segundos como MMmSSs."""
+    """Format seconds as MMmSSs."""
     m = int(seconds) // 60
     s = int(seconds) % 60
     return f"{m:02d}m{s:02d}s"
 
 
 def cut_clip(video_path: str, drop_time: float, output_path: str) -> None:
-    """Recorta un clip del video alrededor del drop."""
+    """Cut a clip from the video around the drop."""
     start = max(0, drop_time - CLIP_BEFORE)
     duration = CLIP_BEFORE + CLIP_AFTER
 
@@ -120,11 +120,11 @@ def cut_clip(video_path: str, drop_time: float, output_path: str) -> None:
 
 
 def process_video(video_path: str) -> None:
-    """Procesa un video: detecta drops y genera clips."""
+    """Process a video: detect drops and generate clips."""
     video_name = os.path.splitext(os.path.basename(video_path))[0]
-    print(f"\nProcesando: {video_name}")
+    print(f"\nProcessing: {video_name}")
 
-    # Extraer audio a archivo temporal
+    # Extract audio to a temporary file
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
         audio_path = tmp.name
 
@@ -135,10 +135,10 @@ def process_video(video_path: str) -> None:
         os.unlink(audio_path)
 
     if not drops:
-        print("  No se detectaron drops.")
+        print("  No drops detected.")
         return
 
-    print(f"  Se detectaron {len(drops)} drops:")
+    print(f"  Detected {len(drops)} drops:")
     for i, t in enumerate(drops, 1):
         ts = format_timestamp(t)
         print(f"    Drop {i}: {ts}")
@@ -146,7 +146,7 @@ def process_video(video_path: str) -> None:
         output_name = f"{video_name}_drop_{i:02d}_{ts}.mp4"
         output_path = os.path.join(OUTPUT_DIR, output_name)
         cut_clip(video_path, t, output_path)
-        print(f"    → {output_name}")
+        print(f"    -> {output_name}")
 
 
 def main():
@@ -157,16 +157,16 @@ def main():
         v for ext in video_extensions for v in glob.glob(os.path.join(INPUT_DIR, ext))
     )
     if not videos:
-        print(f"No se encontraron videos en {INPUT_DIR}/")
-        print("Coloca tus videos de DJ sets ahí y vuelve a ejecutar.")
+        print(f"No videos found in {INPUT_DIR}/")
+        print("Place your DJ set videos there and run again.")
         sys.exit(1)
 
-    print(f"Encontrados {len(videos)} video(s) en {INPUT_DIR}/")
+    print(f"Found {len(videos)} video(s) in {INPUT_DIR}/")
 
     for video_path in videos:
         process_video(video_path)
 
-    print("\nListo! Los clips están en output/")
+    print("\nDone! Clips are in output/")
 
 
 if __name__ == "__main__":
