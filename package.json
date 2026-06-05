@@ -1,0 +1,6 @@
+{
+  "name": "drop-detector",
+  "scripts": {
+    "detect": ".venv/bin/python detect.py"
+  }
+}
