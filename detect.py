@@ -20,7 +20,7 @@ import librosa
 
 # --- Configurable parameters ---
 CLIP_BEFORE = 2        # Seconds before the drop to include in the clip
-CLIP_AFTER = 28        # Seconds after the drop to include in the clip
+CLIP_AFTER = 18        # Seconds after the drop to include in the clip
 MIN_DROP_DISTANCE = 30 # Minimum distance between drops (seconds)
 ENERGY_THRESHOLD = 85  # Percentile to consider an energy peak as a drop
 

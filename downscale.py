@@ -19,7 +19,7 @@ def downscale(video_path: str, output_path: str) -> None:
             "ffmpeg", "-y",
             "-i", video_path,
             "-vf", "scale=-2:1080",
-            "-c:v", "libx264", "-crf", "18", "-preset", "fast",
+            "-c:v", "h264_videotoolbox", "-q:v", "65",
             "-c:a", "aac", "-b:a", "192k",
             output_path,
         ],
