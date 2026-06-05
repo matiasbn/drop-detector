@@ -152,9 +152,12 @@ def process_video(video_path: str) -> None:
 def main():
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    videos = sorted(glob.glob(os.path.join(INPUT_DIR, "*.mp4")))
+    video_extensions = ("*.mp4", "*.mov", "*.mkv", "*.avi")
+    videos = sorted(
+        v for ext in video_extensions for v in glob.glob(os.path.join(INPUT_DIR, ext))
+    )
     if not videos:
-        print(f"No se encontraron videos MP4 en {INPUT_DIR}/")
+        print(f"No se encontraron videos en {INPUT_DIR}/")
         print("Coloca tus videos de DJ sets ahí y vuelve a ejecutar.")
         sys.exit(1)
 
