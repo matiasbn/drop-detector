@@ -13,7 +13,7 @@ The npm scripts are just thin wrappers that invoke the project's virtualenv Pyth
 ```bash
 npm run detect      # input/*.{mp4,mov,mkv,avi}  -> output/<name>_drop_NN_MMmSSs.mp4
 npm run downscale   # output/*                   -> downscaled/* (1080p, Instagram)
-npm run rename      # output/*                   -> output/c1, c2, ... (sequential, in place)
+npm run rename      # output/* and downscaled/*  -> c1, c2, ... (sequential, in place, per folder)
 ```
 
 Equivalent direct calls: `.venv/bin/python detect.py` (and `downscale.py`, `rename.py`).
@@ -38,6 +38,6 @@ input/ ──detect.py──▶ output/ ──downscale.py──▶ downscaled/
 
 - **detect.py** — the core. For each input video: extract mono 22050 Hz WAV (ffmpeg), compute RMS energy with librosa, smooth it (~1s moving average), then keep frames above the `ENERGY_THRESHOLD` percentile. Nearby detections are grouped within `MIN_DROP_DISTANCE` seconds and only the highest-energy peak per group survives. Each surviving drop is cut from the **original** video with `-c copy` (stream copy, no re-encode) into a `CLIP_BEFORE`+`CLIP_AFTER` second clip. The tuning knobs are module-level constants at the top of the file (`CLIP_BEFORE`, `CLIP_AFTER`, `MIN_DROP_DISTANCE`, `ENERGY_THRESHOLD`) — adjust detection behavior there. Note the design choice (docstring of `detect_drops`): it targets absolute energy peaks rather than buildup→drop transitions, so chained drops are captured even when the DJ never lowers energy.
 - **downscale.py** — re-encodes to 1080p height using macOS hardware encoding (`h264_videotoolbox`); not portable to non-Mac without changing the codec.
-- **rename.py** — renames everything in `output/` to `c1`, `c2`, … using a natural sort, going through `_temp_c*` names first to avoid mid-rename collisions.
+- **rename.py** — renames everything in `output/` and `downscaled/` (each folder independently) to `c1`, `c2`, … using a natural sort, going through `_temp_c*` names first to avoid mid-rename collisions.
 
 All scripts resolve their I/O directories relative to the script file (`__file__`), so they work regardless of the current working directory.
