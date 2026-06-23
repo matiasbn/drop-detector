@@ -14,6 +14,7 @@ The npm scripts are just thin wrappers that invoke the project's virtualenv Pyth
 npm run detect      # input/*.{mp4,mov,mkv,avi}  -> output/<name>_drop_NN_MMmSSs.mp4
 npm run downscale   # output/*                   -> downscaled/* (1080p, Instagram)
 npm run rename      # output/* and downscaled/*  -> c1, c2, ... (sequential, in place, per folder)
+npm run clean       # empties input/, output/ and downscaled/ (deletes all files in them)
 ```
 
 Equivalent direct calls: `.venv/bin/python detect.py` (and `downscale.py`, `rename.py`).

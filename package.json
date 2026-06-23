@@ -4,6 +4,7 @@
   "scripts": {
     "detect": ".venv/bin/python detect.py",
     "downscale": ".venv/bin/python downscale.py",
-    "rename": ".venv/bin/python rename.py"
+    "rename": ".venv/bin/python rename.py",
+    "clean": ".venv/bin/python clean.py"
   }
 }
