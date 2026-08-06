@@ -27,8 +27,10 @@ ENERGY_THRESHOLD = 85  # Percentile to consider an energy peak as a drop
 # --- Bar alignment ---
 BEAT_ALIGN = True      # Snap clip start/end to the musical grid
 TARGET_DURATION = 30   # Desired clip length (seconds); rounded to whole bars
-BARS_BEFORE = 1        # Bars of lead-in before the drop
+BARS_BEFORE = 2        # Bars of lead-in before the drop
 BEATS_PER_BAR = 4      # 4/4
+EXPECTED_BPM = 174     # Tempo prior (drum and bass); without it librosa
+                       # locks onto the half-time pulse (~87 BPM)
 
 INPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "input")
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
@@ -98,7 +100,9 @@ def detect_drops(y: np.ndarray, sr: int) -> list[float]:
 def track_beats(y: np.ndarray, sr: int) -> tuple[float, np.ndarray]:
     """Estimate tempo and beat times. Returns (bpm, beat_times)."""
     print("  Tracking beats...")
-    tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr, units="frames")
+    tempo, beat_frames = librosa.beat.beat_track(
+        y=y, sr=sr, units="frames", start_bpm=EXPECTED_BPM
+    )
     beat_times = librosa.frames_to_time(beat_frames, sr=sr)
     return float(np.atleast_1d(tempo)[0]), beat_times
 
