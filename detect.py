@@ -24,6 +24,12 @@ CLIP_AFTER = 28        # Seconds after the drop to include in the clip
 MIN_DROP_DISTANCE = 30 # Minimum distance between drops (seconds)
 ENERGY_THRESHOLD = 85  # Percentile to consider an energy peak as a drop
 
+# --- Bar alignment ---
+BEAT_ALIGN = True      # Snap clip start/end to the musical grid
+TARGET_DURATION = 30   # Desired clip length (seconds); rounded to whole bars
+BARS_BEFORE = 1        # Bars of lead-in before the drop
+BEATS_PER_BAR = 4      # 4/4
+
 INPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "input")
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
 
@@ -43,7 +49,7 @@ def extract_audio(video_path: str, audio_path: str) -> None:
     )
 
 
-def detect_drops(audio_path: str) -> list[float]:
+def detect_drops(y: np.ndarray, sr: int) -> list[float]:
     """
     Analyze audio and detect high-energy moments.
 
@@ -52,9 +58,6 @@ def detect_drops(audio_path: str) -> list[float]:
 
     Returns a list of timestamps (in seconds) where drops occur.
     """
-    print("  Loading audio...")
-    y, sr = librosa.load(audio_path, sr=22050)
-
     print("  Analyzing energy...")
     hop_length = 2048
     rms = librosa.feature.rms(y=y, frame_length=4096, hop_length=hop_length)[0]
@@ -92,6 +95,42 @@ def detect_drops(audio_path: str) -> list[float]:
     return drops
 
 
+def track_beats(y: np.ndarray, sr: int) -> tuple[float, np.ndarray]:
+    """Estimate tempo and beat times. Returns (bpm, beat_times)."""
+    print("  Tracking beats...")
+    tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr, units="frames")
+    beat_times = librosa.frames_to_time(beat_frames, sr=sr)
+    return float(np.atleast_1d(tempo)[0]), beat_times
+
+
+def align_to_bars(drop_time: float, beats: np.ndarray) -> tuple[float, float]:
+    """
+    Snap a clip to the musical grid around a drop.
+
+    The grid is anchored on the drop itself (drops land on a downbeat), so the
+    clip starts BARS_BEFORE bars earlier and lasts a whole number of bars close
+    to TARGET_DURATION. Returns (start, duration) in seconds.
+    """
+    fallback = (max(0.0, drop_time - CLIP_BEFORE), CLIP_BEFORE + CLIP_AFTER)
+    if len(beats) < 2 * BEATS_PER_BAR:
+        return fallback
+
+    drop_i = int(np.argmin(np.abs(beats - drop_time)))
+
+    # Median beat period is more robust than the reported BPM on long sets.
+    beat_period = float(np.median(np.diff(beats)))
+    bar = beat_period * BEATS_PER_BAR
+    bars = max(1, round(TARGET_DURATION / bar))
+
+    start_i = drop_i - BARS_BEFORE * BEATS_PER_BAR
+    end_i = start_i + bars * BEATS_PER_BAR
+    if start_i < 0 or end_i >= len(beats):
+        return fallback
+
+    start = float(beats[start_i])
+    return start, float(beats[end_i]) - start
+
+
 def format_timestamp(seconds: float) -> str:
     """Format seconds as MMmSSs."""
     m = int(seconds) // 60
@@ -99,10 +138,20 @@ def format_timestamp(seconds: float) -> str:
     return f"{m:02d}m{s:02d}s"
 
 
-def cut_clip(video_path: str, drop_time: float, output_path: str) -> None:
-    """Cut a clip from the video around the drop."""
-    start = max(0, drop_time - CLIP_BEFORE)
-    duration = CLIP_BEFORE + CLIP_AFTER
+def cut_clip(video_path: str, start: float, duration: float, output_path: str) -> None:
+    """
+    Cut a clip from the video.
+
+    Stream copy can only cut on keyframes, which drifts the start by up to a GOP
+    and would undo the bar alignment, so aligned clips are re-encoded instead.
+    """
+    if BEAT_ALIGN:
+        codec_args = [
+            "-c:v", "h264_videotoolbox", "-q:v", "80",
+            "-c:a", "aac", "-b:a", "192k",
+        ]
+    else:
+        codec_args = ["-c", "copy"]
 
     subprocess.run(
         [
@@ -110,7 +159,7 @@ def cut_clip(video_path: str, drop_time: float, output_path: str) -> None:
             "-ss", str(start),
             "-i", video_path,
             "-t", str(duration),
-            "-c", "copy",
+            *codec_args,
             output_path,
         ],
         stdout=subprocess.DEVNULL,
@@ -130,22 +179,34 @@ def process_video(video_path: str) -> None:
 
     try:
         extract_audio(video_path, audio_path)
-        drops = detect_drops(audio_path)
+        print("  Loading audio...")
+        y, sr = librosa.load(audio_path, sr=22050)
     finally:
         os.unlink(audio_path)
+
+    drops = detect_drops(y, sr)
 
     if not drops:
         print("  No drops detected.")
         return
 
+    if BEAT_ALIGN:
+        bpm, beats = track_beats(y, sr)
+        print(f"  Tempo: {bpm:.1f} BPM")
+    else:
+        beats = np.array([])
+
     print(f"  Detected {len(drops)} drops:")
     for i, t in enumerate(drops, 1):
         ts = format_timestamp(t)
-        print(f"    Drop {i}: {ts}")
+        start, duration = align_to_bars(t, beats) if BEAT_ALIGN else (
+            max(0.0, t - CLIP_BEFORE), float(CLIP_BEFORE + CLIP_AFTER)
+        )
+        print(f"    Drop {i}: {ts} ({duration:.1f}s)")
 
         output_name = f"{video_name}_drop_{i:02d}_{ts}.mp4"
         output_path = os.path.join(OUTPUT_DIR, output_name)
-        cut_clip(video_path, t, output_path)
+        cut_clip(video_path, start, duration, output_path)
         print(f"    -> {output_name}")
 
 
