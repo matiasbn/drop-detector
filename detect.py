@@ -29,6 +29,8 @@ BEAT_ALIGN = True      # Snap clip start/end to the musical grid
 TARGET_DURATION = 30   # Desired clip length (seconds); rounded to whole bars
 BARS_BEFORE = 2        # Bars of lead-in before the drop
 BEATS_PER_BAR = 4      # 4/4
+BARS_PER_PHRASE = 16   # Clip length is quantized to whole phrases, not bars:
+                       # ending mid-phrase lands on a beat but still hangs
 EXPECTED_BPM = 174     # Tempo prior (drum and bass); without it librosa
                        # locks onto the half-time pulse (~87 BPM)
 
@@ -111,9 +113,10 @@ def align_to_bars(drop_time: float, beats: np.ndarray) -> tuple[float, float]:
     """
     Snap a clip to the musical grid around a drop.
 
-    The grid is anchored on the drop itself (drops land on a downbeat), so the
-    clip starts BARS_BEFORE bars earlier and lasts a whole number of bars close
-    to TARGET_DURATION. Returns (start, duration) in seconds.
+    The grid is anchored on the drop itself (drops land on a downbeat). The clip
+    starts BARS_BEFORE bars earlier and ends a whole number of phrases *after
+    the drop* — counting phrases from the start instead would push the end back
+    into the middle of one. Returns (start, duration) in seconds.
     """
     fallback = (max(0.0, drop_time - CLIP_BEFORE), CLIP_BEFORE + CLIP_AFTER)
     if len(beats) < 2 * BEATS_PER_BAR:
@@ -124,10 +127,11 @@ def align_to_bars(drop_time: float, beats: np.ndarray) -> tuple[float, float]:
     # Median beat period is more robust than the reported BPM on long sets.
     beat_period = float(np.median(np.diff(beats)))
     bar = beat_period * BEATS_PER_BAR
-    bars = max(1, round(TARGET_DURATION / bar))
+    lead_in = BARS_BEFORE * bar
+    phrases = max(1, round((TARGET_DURATION - lead_in) / (bar * BARS_PER_PHRASE)))
 
     start_i = drop_i - BARS_BEFORE * BEATS_PER_BAR
-    end_i = start_i + bars * BEATS_PER_BAR
+    end_i = drop_i + phrases * BARS_PER_PHRASE * BEATS_PER_BAR
     if start_i < 0 or end_i >= len(beats):
         return fallback
 
