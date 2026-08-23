@@ -48,7 +48,7 @@ EXPECTED_BPM = 174     # Tempo prior (drum and bass); without it librosa
                        # locks onto the half-time pulse (~87 BPM)
 
 # --- Interviews: transcript + Claude ---
-MOMENTS = 10           # How many highlights to ask Claude for
+MOMENTS = 30           # How many highlights to ask Claude for
 MIN_MOMENT = 15        # Reject anything shorter (seconds)
 MAX_MOMENT = 90        # Reject anything longer (seconds)
 WHISPER_MODEL = "mlx-community/whisper-large-v3-mlx"
@@ -82,6 +82,14 @@ Rules for the timestamps:
 - each clip must be between {min_moment} and {max_moment} seconds long
 - clips must not overlap each other
 - use the timestamps from the transcript; never invent one
+
+Order the list best first, strongest clip at the top.
+
+Rank on how well the fragment works *pulled out of the interview*, not on how \
+important it was to the conversation: the strength of its opening, whether the \
+idea closes on its own, and how memorable it is. A point that is central to the \
+interview but needs ten minutes of setup ranks below a side story that lands in \
+twenty seconds.
 
 Write `title` and `reason` in the same language as the transcript. Keep `title` \
 short — a few words, usable as a filename.
@@ -390,28 +398,36 @@ def plan_interview_clips(video_path: str, video_name: str, llm: str) -> list[dic
     raw = (call_claude_cli if llm == LLM_CLI else call_claude_api)(system, prompt)
     moments = parse_moments(raw)
 
+    # The list arrives ranked best-first and is kept that way, so clip 01 is the
+    # strongest one. When two overlap, the higher-ranked clip is the one to keep.
     total_duration = video_duration(video_path)
     clips = []
     for m in moments:
         start, duration = snap_to_segments(
             float(m["start"]), float(m["end"]), segments, total_duration
         )
+        title = m.get("title", "?")
+
         # The model can propose a cut that snapping or clamping ruins; drop
         # those rather than hand ffmpeg a negative or absurd duration.
         if not MIN_MOMENT <= duration <= MAX_MOMENT:
-            print(f"    Skipping {m.get('title', '?')!r}: {duration:.1f}s out of range")
+            print(f"    Skipping {title!r}: {duration:.1f}s out of range")
             continue
+        if any(start < c["start"] + c["duration"] and c["start"] < start + duration
+               for c in clips):
+            print(f"    Skipping {title!r}: overlaps a higher-ranked clip")
+            continue
+
         clips.append(
             {
                 "at": start,
                 "start": start,
                 "duration": duration,
-                "title": m.get("title", ""),
+                "title": title,
                 "reason": m.get("reason", ""),
             }
         )
 
-    clips.sort(key=lambda c: c["start"])
     save_notes(video_name, clips)
     return clips
 
@@ -420,6 +436,7 @@ def save_notes(video_name: str, clips: list[dict]) -> None:
     """Write why each moment was picked, next to the transcript."""
     path = os.path.join(TRANSCRIPT_DIR, f"{video_name}_moments.txt")
     with open(path, "w") as f:
+        f.write(f"{video_name} - {len(clips)} moments, best first\n\n")
         for i, c in enumerate(clips, 1):
             f.write(
                 f"{i:02d}. [{format_timestamp(c['start'])}] "
