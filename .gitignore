@@ -5,3 +5,4 @@ downscaled/
 __pycache__/
 *.pyc
 .venv/
+transcripts/

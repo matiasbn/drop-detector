@@ -1,3 +1,8 @@
 librosa>=0.10.0
 numpy>=1.24.0
 ffmpeg-python>=0.2.0
+mlx-whisper>=0.4.0
+
+# Only needed for `detect.py --mode interview --llm api`; the default
+# `--llm cli` path shells out to Claude Code instead.
+# anthropic>=1.0.0
