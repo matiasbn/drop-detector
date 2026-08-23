@@ -271,11 +271,18 @@ def transcribe(video_path: str, video_name: str) -> list[dict]:
         audio_path = tmp.name
     try:
         extract_audio(video_path, audio_path, sample_rate=16000)
-        print(f"  Transcribing with {WHISPER_MODEL} (this takes a while)...")
+        print(f"  Transcribing with {WHISPER_MODEL}...")
+        # verbose=False draws a progress bar over the audio frames (True would
+        # print the text instead, with no sense of how much is left). Whisper's
+        # default of None prints nothing at all, which leaves the run silent for
+        # however long an hour of audio takes and reads as a hang -- worst on
+        # the first run, right after the model download signs off with its own
+        # "Reconstruction complete".
         result = mlx_whisper.transcribe(
             audio_path,
             path_or_hf_repo=WHISPER_MODEL,
             language=WHISPER_LANGUAGE,
+            verbose=False,
         )
     finally:
         os.unlink(audio_path)
