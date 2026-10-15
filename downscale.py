@@ -14,7 +14,7 @@ OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "downscale
 
 
 def downscale(video_path: str, output_path: str) -> None:
-    subprocess.run(
+    result = subprocess.run(
         [
             "ffmpeg", "-y",
             "-i", video_path,
@@ -24,9 +24,13 @@ def downscale(video_path: str, output_path: str) -> None:
             output_path,
         ],
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=True,
+        stderr=subprocess.PIPE,
+        text=True,
+        errors="replace",
     )
+    if result.returncode != 0:
+        tail = result.stderr.strip().splitlines()[-1:] or ["no output"]
+        raise RuntimeError(f"ffmpeg failed: {tail[0]}")
 
 
 def main():
@@ -42,12 +46,22 @@ def main():
         sys.exit(1)
 
     print(f"Downscaling {len(videos)} video(s) to 1080p...")
+    failed = []
     for i, video_path in enumerate(videos, 1):
         name = os.path.basename(video_path)
         print(f"  [{i}/{len(videos)}] {name}")
         output_path = os.path.join(OUTPUT_DIR, name)
-        downscale(video_path, output_path)
+        try:
+            downscale(video_path, output_path)
+        except Exception as e:
+            print(f"    !! failed: {e}")
+            failed.append(f"{name}: {e}")
 
+    if failed:
+        print(f"\nDone with {len(failed)} failure(s):")
+        for f in failed:
+            print(f"  - {f}")
+        sys.exit(1)
     print(f"\nDone! Videos are in downscaled/")
 
 

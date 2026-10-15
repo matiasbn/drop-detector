@@ -99,18 +99,25 @@ Return ONLY a JSON object, no prose and no code fence:
 """
 
 
+def run_ffmpeg(args: list[str]) -> None:
+    """Run ffmpeg quietly, but keep the reason when it fails."""
+    result = subprocess.run(
+        ["ffmpeg", "-y", *args],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+        errors="replace",
+    )
+    if result.returncode != 0:
+        tail = result.stderr.strip().splitlines()[-1:] or ["no output"]
+        raise RuntimeError(f"ffmpeg failed: {tail[0]}")
+
+
 def extract_audio(video_path: str, audio_path: str, sample_rate: int = 22050) -> None:
     """Extract audio from a video file to mono WAV."""
     print(f"  Extracting audio from {os.path.basename(video_path)}...")
-    subprocess.run(
-        [
-            "ffmpeg", "-y", "-i", video_path,
-            "-ac", "1", "-ar", str(sample_rate), "-vn",
-            audio_path,
-        ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=True,
+    run_ffmpeg(
+        ["-i", video_path, "-ac", "1", "-ar", str(sample_rate), "-vn", audio_path]
     )
 
 
@@ -172,7 +179,18 @@ def detect_drops(y: np.ndarray, sr: int) -> list[float]:
 
     group = high_energy_frames[group_start:]
     drops.append(times[group_start + int(np.argmax(rms_smooth[group]))])
-    return drops
+
+    # Groups are MIN_DROP_DISTANCE wide, so the peaks of two neighbouring groups
+    # can sit seconds apart (one at the end of its group, the next at the start
+    # of its own) and yield two near-identical clips. Keep the louder one.
+    energy = lambda t: rms_smooth[librosa.time_to_frames(t, sr=sr, hop_length=hop_length)]
+    kept = [drops[0]]
+    for t in drops[1:]:
+        if t - kept[-1] >= MIN_DROP_DISTANCE:
+            kept.append(t)
+        elif energy(t) > energy(kept[-1]):
+            kept[-1] = t
+    return kept
 
 
 def track_beats(y: np.ndarray, sr: int) -> tuple[float, np.ndarray]:
@@ -481,23 +499,17 @@ def cut_clip(
     else:
         codec_args = ["-c", "copy"]
 
-    subprocess.run(
-        [
-            "ffmpeg", "-y",
-            "-ss", str(start),
-            "-i", video_path,
-            "-t", str(duration),
-            *codec_args,
-            output_path,
-        ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=True,
+    run_ffmpeg(
+        ["-ss", str(start), "-i", video_path, "-t", str(duration), *codec_args, output_path]
     )
 
 
-def process_video(video_path: str, mode: str, llm: str) -> None:
-    """Process a video: find the good moments and generate clips."""
+def process_video(video_path: str, mode: str, llm: str, failed: list[str]) -> None:
+    """
+    Process a video: find the good moments and generate clips.
+
+    A clip that fails to cut is recorded in `failed` and the rest still get cut.
+    """
     video_name = os.path.splitext(os.path.basename(video_path))[0]
     print(f"\nProcessing: {video_name}")
 
@@ -519,13 +531,18 @@ def process_video(video_path: str, mode: str, llm: str) -> None:
         print(f"    {label.capitalize()} {i}: {ts} ({clip['duration']:.1f}s){title}")
 
         output_name = f"{video_name}_{label}_{i:02d}_{ts}.mp4"
-        cut_clip(
-            video_path,
-            clip["start"],
-            clip["duration"],
-            os.path.join(OUTPUT_DIR, output_name),
-            precise,
-        )
+        try:
+            cut_clip(
+                video_path,
+                clip["start"],
+                clip["duration"],
+                os.path.join(OUTPUT_DIR, output_name),
+                precise,
+            )
+        except Exception as e:
+            print(f"    !! {output_name} failed: {e}")
+            failed.append(f"{output_name}: {e}")
+            continue
         print(f"    -> {output_name}")
 
 
@@ -576,9 +593,20 @@ def main():
     mode = args.mode or ask_mode()
     print(f"Mode: {mode}")
 
+    failed = []
     for video_path in videos:
-        process_video(video_path, mode, args.llm)
+        try:
+            process_video(video_path, mode, args.llm, failed)
+        except Exception as e:
+            name = os.path.basename(video_path)
+            print(f"  !! {name} failed: {e}")
+            failed.append(f"{name}: {e}")
 
+    if failed:
+        print(f"\nDone with {len(failed)} failure(s):")
+        for f in failed:
+            print(f"  - {f}")
+        sys.exit(1)
     print("\nDone! Clips are in output/")
 
 
