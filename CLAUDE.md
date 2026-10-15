@@ -17,6 +17,7 @@ The npm scripts are just thin wrappers that invoke the project's virtualenv Pyth
 npm run detect      # input/*.{mp4,mov,mkv,avi}  -> output/<name>_{drop,moment}_NN_MMmSSs.mp4
 npm run downscale   # output/*                   -> downscaled/* (1080p, Instagram)
 npm run rename      # output/* and downscaled/*  -> c1, c2, ... (sequential, in place, per folder)
+npm run rank "<set folder>"  # keeps the 15 clips with the most lights in <set folder>/carrusel, rest -> carrusel/descartados/
 npm run clean       # empties input/, output/ and downscaled/ (deletes all files in them)
 ```
 
@@ -59,5 +60,7 @@ input/ ──detect.py──▶ output/ ──downscale.py──▶ downscaled/
 
 - **downscale.py** — re-encodes to 1080p height using macOS hardware encoding (`h264_videotoolbox`); not portable to non-Mac without changing the codec.
 - **rename.py** — renames everything in `output/` and `downscaled/` (each folder independently) to `c1`, `c2`, … using a natural sort, going through `_temp_c*` names first to avoid mid-rename collisions.
+
+- **rank.py** — post-selection for a finished carousel (`<set folder>/carrusel/` next to `video-audio.mov`). The sets are filmed in front of LED walls and the light show, not the drop, is what makes a clip worth posting, so each clip is scored by mean frame-to-frame brightness change over the top of the frame (the wall, not the decks). The best `KEEP` at least `MIN_GAP` s apart are renamed c1.. by rank; the rest are moved, never deleted, to `descartados/`. Clip timestamps are recovered by re-running `plan_set_clips` on the long video (cached in `carrusel/.times.json`), so it only works on an untouched detect→downscale→rename output.
 
 All scripts resolve their I/O directories relative to the script file (`__file__`), so they work regardless of the current working directory.
