@@ -162,6 +162,9 @@ def main():
                         help=f"clips left in carrusel/ (default {KEEP})")
     parser.add_argument("--gap", type=float, default=MIN_GAP,
                         help=f"min seconds between kept clips (default {MIN_GAP})")
+    parser.add_argument("--video", default="video-audio.mov",
+                        help="the long video the clips were cut from, inside the "
+                        "set folder (default video-audio.mov)")
     args = parser.parse_args()
 
     carrusel = os.path.join(args.folder, "carrusel")
@@ -177,7 +180,7 @@ def main():
         sys.exit(f"No clips in {carrusel}")
     print(f"{len(paths)} clips in {carrusel}")
 
-    starts = clip_times(os.path.join(args.folder, "video-audio.mov"), carrusel, len(paths))
+    starts = clip_times(os.path.join(args.folder, args.video), carrusel, len(paths))
 
     print("Scoring lights...")
     scored = []
