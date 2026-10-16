@@ -5,8 +5,12 @@ Rank - Keeps the clips with the strongest light show and sets the rest aside.
 The sets are filmed in front of LED walls, and what makes a clip worth posting
 is the lights going off, not the drop itself. Each clip is scored by how much
 the picture changes from frame to frame (strobes, blackouts, colour hits), the
-best KEEP are kept at least MIN_GAP seconds apart, and the rest are moved to
-carrusel/descartados/ -- nothing is deleted.
+best KEEP are kept at least MIN_GAP seconds apart, and the rest are moved --
+nothing is deleted -- to carrusel/repetidos/ when they fall within MIN_GAP of a
+kept clip (same stretch of the set) or to carrusel/descartados/ otherwise.
+
+Run again on a folder ranked before repetidos/ existed, it only splits the
+repeated clips out of descartados/, using ranking.txt.
 
 Usage:
     python rank.py "<set folder>"     (holds video-audio.mov and carrusel/)
@@ -37,6 +41,7 @@ WIDTH, HEIGHT = 64, 36
 WALL = 0.7         # Top fraction of the frame scored; the decks are below
 
 DISCARD = "descartados"
+REPEATED = "repetidos"
 
 
 def natural_key(path: str) -> int:
@@ -76,6 +81,44 @@ def clip_times(video: str, carrusel: str, n: int) -> list[float]:
     return starts
 
 
+def seconds(ts: str) -> int:
+    """Inverse of detect.format_timestamp: '14m33s' -> 873."""
+    m, s = re.fullmatch(r"(\d+)m(\d+)s", ts).groups()
+    return int(m) * 60 + int(s)
+
+
+def write_ranking(carrusel: str, clips: list[dict]) -> None:
+    with open(os.path.join(carrusel, "ranking.txt"), "w") as f:
+        f.write("score  time    file\n")
+        for c in clips:
+            f.write(f"{c['score']:.3f}  {detect.format_timestamp(c['start'])}  {c['new']}\n")
+
+
+def split_repeated(carrusel: str, gap: float) -> None:
+    """Move the discarded clips that repeat a kept one out to repetidos/."""
+    with open(os.path.join(carrusel, "ranking.txt")) as f:
+        rows = [line.split() for line in f.readlines()[1:] if line.strip()]
+    clips = [{"score": float(r[0]), "start": seconds(r[1]), "new": r[2]} for r in rows]
+    kept = [c for c in clips if "/" not in c["new"]]
+
+    os.makedirs(os.path.join(carrusel, REPEATED))
+    moved = 0
+    for c in clips:
+        if c["new"].startswith(f"{DISCARD}/") and any(
+            abs(c["start"] - k["start"]) < gap for k in kept
+        ):
+            new = f"{REPEATED}/{os.path.basename(c['new'])}"
+            try:
+                os.rename(os.path.join(carrusel, c["new"]), os.path.join(carrusel, new))
+            except OSError as e:
+                print(f"  !! {c['new']} not moved: {e}")
+                continue
+            c["new"] = new
+            moved += 1
+    write_ranking(carrusel, clips)
+    print(f"Moved {moved} repeated clips from {DISCARD}/ to {REPEATED}/")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -87,7 +130,10 @@ def main():
     carrusel = os.path.join(args.folder, "carrusel")
     discard_dir = os.path.join(carrusel, DISCARD)
     if os.path.isdir(discard_dir):
-        sys.exit(f"{DISCARD}/ already exists in {carrusel}; already ranked.")
+        if os.path.isdir(os.path.join(carrusel, REPEATED)):
+            sys.exit(f"{carrusel} is already ranked.")
+        split_repeated(carrusel, args.gap)
+        return
 
     clips = sorted(glob.glob(os.path.join(carrusel, "c*.mp4")), key=natural_key)
     if not clips:
@@ -112,13 +158,18 @@ def main():
         close = any(abs(c["start"] - k["start"]) < args.gap for k in kept)
         (dropped if close or len(kept) >= args.keep else kept).append(c)
 
-    # Kept clips are renamed by rank (c1 = best light show); discarded ones by
-    # their time in the set. Temp names first, as in rename.py.
+    # Kept clips are renamed by rank (c1 = best light show); the others by
+    # their time in the set, into repetidos/ if they repeat a kept clip's
+    # stretch and descartados/ if they just didn't make the cut. Temp names
+    # first, as in rename.py.
     os.makedirs(discard_dir)
+    os.makedirs(os.path.join(carrusel, REPEATED))
     for c in dropped:
+        repeated = any(abs(c["start"] - k["start"]) < args.gap for k in kept)
+        folder = REPEATED if repeated else DISCARD
         name = f"{detect.format_timestamp(c['start'])}.mp4"
-        os.rename(c["path"], os.path.join(discard_dir, name))
-        c["new"] = f"{DISCARD}/{name}"
+        os.rename(c["path"], os.path.join(carrusel, folder, name))
+        c["new"] = f"{folder}/{name}"
     for i, c in enumerate(kept, 1):
         tmp = os.path.join(carrusel, f"_temp_c{i}.mp4")
         os.rename(c["path"], tmp)
@@ -127,13 +178,11 @@ def main():
         os.rename(c["path"], os.path.join(carrusel, f"c{i}.mp4"))
         c["new"] = f"c{i}.mp4"
 
-    with open(os.path.join(carrusel, "ranking.txt"), "w") as f:
-        f.write("score  time    file\n")
-        for c in kept + dropped:
-            f.write(f"{c['score']:.3f}  {detect.format_timestamp(c['start'])}  {c['new']}\n")
+    write_ranking(carrusel, kept + dropped)
 
-    print(f"\nKept {len(kept)} in carrusel/ (c1 = most lights), "
-          f"moved {len(dropped)} to {DISCARD}/. See ranking.txt")
+    n_rep = sum(c["new"].startswith(REPEATED) for c in dropped)
+    print(f"\nKept {len(kept)} in carrusel/ (c1 = most lights), moved {n_rep} to "
+          f"{REPEATED}/ and {len(dropped) - n_rep} to {DISCARD}/. See ranking.txt")
 
 
 if __name__ == "__main__":
