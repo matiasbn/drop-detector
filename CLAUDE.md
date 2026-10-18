@@ -193,7 +193,7 @@ Makes a vertical reel from one carousel clip, modelled on the hand-edited `9-kap
 4. **Rendering** (`render`). ffmpeg's `sendcmd` feeds per-frame commands (`crop x`, `crop y`, `rotate a`) to a `crop → rotate → crop → scale` chain, so the whole moving camera is one ffmpeg pass over the 4K source. The `.cmd` file lives in a temp dir.
 5. **Outro.** The last `FLASH` (0.2) s of the clip get a flash (brightness +0.45, contrast 0.7, 10 px blur, ±24 px red/blue split), then `assets/outro-dnbchile.mp4` (resampled to the clip's frame rate) is concatenated. The audio is the set's own, taken from the long video for clip + outro length, running at full level under the logo and fading out over the last `FADE` (1) s — the same shape as the kapza reel.
 
-How the defaults were tuned, against the kapza reel and the user's feedback on saintcris c15 (v1→v5, kept in `10-saintcris/reel-prueba-c15*.mp4`):
+How the defaults were tuned, against the kapza reel and the user's feedback on saintcris c15 (v1→v5, since deleted):
 
 | Version | Change | Verdict |
 |---|---|---|
@@ -249,7 +249,7 @@ The sets live in Google Drive at:
 State of the folders (Oct 2026):
 - `1-` to `9-` were done by hand before `rank.py` existed; their `carrusel/` holds the hand-picked clips. `5-mute/carrusel` is empty and its clips are in `carrusel-bkp/`.
 - `4-alan` has no `video-audio.mov`: its long video is `elsotano2.mov` (pass `--video elsotano2.mov` to rank.py/reel.py). Its carousel was regenerated with the full pipeline in Oct 2026 (41 drops, 15 kept); the old c1–c5 were CapCut exports and were deleted.
-- `10-saintcris` to `14-triggered` were produced with the full pipeline (35–52 drops each, 15 kept by `rank.py`). `10-saintcris/reel-promo.mp4` is reel.py's reel from c7; `reel-prueba-c15*.mp4` are the tuning iterations.
+- `10-saintcris` to `14-triggered` were produced with the full pipeline (35–52 drops each, 15 kept by `rank.py`). No reels are kept there yet: the c7 reel and the c15 tuning iterations were deleted at the user's request.
 - `extras/` and `z-*` are not sets to process.
 - Colour: all `video-audio.mov` are DaVinci exports and carry a grade relative to the raw camera file, but 10–14 got a lighter one than the earlier sets (saturation ×1.4–1.7 vs ×1.9–2.3 for 6/9; 11-vagrant ×1.0), and every set has lifted blacks (2nd-percentile luma ~0.12).
 
