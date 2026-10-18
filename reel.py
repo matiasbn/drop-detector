@@ -15,6 +15,7 @@ Usage:
     python reel.py "<set folder>" c15 [c3 ...]          # clips from carrusel/
     python reel.py "<set folder>" descartados/47m52s     # any clip in ranking.txt
     python reel.py "<set folder>" --start 1159.9 --duration 24.7
+    python reel.py "<set folder>" c7 --skip 5        # from second 5 of the clip
 
 Writes <set folder>/reel-<clip>.mp4. The clip is cut again from the 4K
 video-audio.mov, not upscaled from the 1080p carousel file.
@@ -241,6 +242,8 @@ def main():
     parser.add_argument("--start", type=float, help="cut by time instead of by clip (seconds)")
     parser.add_argument("--duration", type=float, help="with --start (seconds)")
     parser.add_argument("--video", default="video-audio.mov", help="long video inside the folder")
+    parser.add_argument("--skip", type=float, default=0.0,
+                        help="start this many seconds into the clip (it still ends where the clip ends)")
     parser.add_argument("--zoom", type=float, default=ZOOM, help=f"default {ZOOM}")
     parser.add_argument("--follow-x", type=float, default=FOLLOW_X, help=f"seconds, default {FOLLOW_X}")
     parser.add_argument("--follow-y", type=float, default=FOLLOW_Y, help=f"seconds, default {FOLLOW_Y}")
@@ -277,6 +280,10 @@ def main():
         print(f"{name}:")
         try:
             start, duration = span()
+            if opts.skip:
+                if opts.skip >= duration - 5:
+                    raise ValueError(f"--skip {opts.skip:g} leaves less than 5 s of a {duration:.1f}s clip")
+                start, duration = start + opts.skip, duration - opts.skip
             print(f"    {start:.1f}s + {duration:.1f}s from {opts.video}")
             t, cx, top = track_dj(detector, video, start, duration)
             path = camera_path(t, cx, top, src, duration, opts)

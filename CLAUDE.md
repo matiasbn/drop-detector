@@ -80,6 +80,7 @@ npm only forwards `--options` after a bare `--`; the direct call doesn't need it
 | `clips` (positional, 1+) | — | Clip names as they appear in `carrusel/ranking.txt`: `c7`, `c15`, `repetidos/47m52s`, `descartados/59m31s`. One reel per clip; a failing clip doesn't stop the rest. |
 | `--start S --duration S` | — | Cut by time (seconds into the long video) instead of by clip name. Doesn't need `ranking.txt`. |
 | `--video NAME` | `video-audio.mov` | The long video inside the folder. |
+| `--skip S` | `0` | Start S seconds into the clip; the reel still ends where the clip ends (so it's S seconds shorter). Refuses to leave under 5 s. |
 | `--out PATH` | `<folder>/reel-<clip>.mp4` | Output path; single clip only. The approved finals are saved as `reel-promo.mp4`, the name used in 9-kapza. |
 | `--zoom Z` | `1.35` (`ZOOM`) | Crop height = source height / Z. Higher = tighter on the DJ. |
 | `--follow-x S` | `0.12` (`FOLLOW_X`) | Seconds of smoothing on the horizontal follow. Lower = snappier. |
