@@ -6,6 +6,7 @@
     "downscale": ".venv/bin/python downscale.py",
     "rename": ".venv/bin/python rename.py",
     "clean": ".venv/bin/python clean.py",
-    "rank": ".venv/bin/python rank.py"
+    "rank": ".venv/bin/python rank.py",
+    "reel": ".venv/bin/python reel.py"
   }
 }
