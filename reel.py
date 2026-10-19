@@ -300,7 +300,7 @@ def main():
         sys.exit(
             f"Missing {OUTRO} (gitignored, so it doesn't come with a clone). Rebuild it\n"
             "from the kapza reel, whose last 2.9 s are the glitch + logo + black hole:\n"
-            '  ffmpeg -ss 17.2 -i ".../el-sotano/9-kapza/reel-promo.mp4" -an '
+            '  ffmpeg -ss 17.2 -i ".../el-sotano/7-kapza/reel-promo.mp4" -an '
             '-vf "fps=24000/1001,format=yuv420p" -c:v h264_videotoolbox -b:v 14M '
             "assets/outro-dnbchile.mp4\nor pass --no-outro."
         )

@@ -70,7 +70,7 @@ npm only forwards `--options` after a bare `--`; the direct call doesn't need it
 | `folder` (positional) | — | The set folder, holding the long video and `carrusel/`. |
 | `--keep N` | `15` (`KEEP`) | How many clips stay in `carrusel/` as c1..cN. |
 | `--gap S` | `45` (`MIN_GAP`) | Minimum seconds between the start times of two kept clips. A discarded clip closer than this to a kept one goes to `repetidos/`. |
-| `--video NAME` | `video-audio.mov` | The long video inside the folder (4-alan's is `elsotano2.mov`). |
+| `--video NAME` | `video-audio.mov` | The long video inside the folder (9-alan's is `elsotano2.mov`). |
 
 ### `reel.py` arguments
 
@@ -82,7 +82,7 @@ npm only forwards `--options` after a bare `--`; the direct call doesn't need it
 | `--video NAME` | `video-audio.mov` | The long video inside the folder. |
 | `--skip S` | `0` | Start S seconds into the clip; the end doesn't move (so the reel is S seconds shorter). Refuses to leave under 5 s. |
 | `--bars N` | `12` (`BARS`) | Bars after the drop before the logo comes in. The cut ends on a bar, so with multiples of 4 the logo lands on a phrase change. 12 → ~19 s of set + 2.9 s outro ≈ 22 s; 8 → ≈ 16.5 s; `0` keeps the whole clip (≈ 27 s). Clip reels only, not `--start`. |
-| `--out PATH` | `<folder>/reel-<clip>.mp4` | Output path; single clip only. The approved finals are saved as `reel-promo.mp4`, the name used in 9-kapza. |
+| `--out PATH` | `<folder>/reel-<clip>.mp4` | Output path; single clip only. The approved finals are saved as `reel-promo.mp4`, the name used in 7-kapza. |
 | `--zoom Z` | `1.35` (`ZOOM`) | Crop height = source height / Z. Higher = tighter on the DJ. |
 | `--follow-x S` | `0.12` (`FOLLOW_X`) | Seconds of smoothing on the horizontal follow. Lower = snappier. |
 | `--follow-y S` | `0.3` (`FOLLOW_Y`) | Seconds of smoothing on the vertical follow. |
@@ -187,7 +187,7 @@ Post-selection for a finished carousel (`<set folder>/carrusel/` next to the lon
 
 ### reel.py
 
-Makes a vertical reel from one carousel clip, modelled on the hand-edited `9-kapza/reel-promo.mp4` (made in CapCut). The output is 1080×1920 at the source frame rate (23.976), ~22 s by default (the user wants reels of 20–25 s), h264_videotoolbox at 14 Mb/s, AAC 192k. One clip takes ~7 minutes on a busy machine (most of it decoding 4K twice).
+Makes a vertical reel from one carousel clip, modelled on the hand-edited `7-kapza/reel-promo.mp4` (made in CapCut). The output is 1080×1920 at the source frame rate (23.976), ~22 s by default (the user wants reels of 20–25 s), h264_videotoolbox at 14 Mb/s, AAC 192k. One clip takes ~7 minutes on a busy machine (most of it decoding 4K twice).
 
 1. **Which span.** `clip_span` looks the clip up in `carrusel/ranking.txt` (start rounded to the second), snaps to the nearest exact start in `carrusel/.times.json`, and takes the duration from the carousel file itself. `phrase_cut` then shortens it to end `--bars` bars after the drop: clips are bar-aligned (start 2 bars before the drop, last a whole number of bars), so the bar length is the duration divided by the bar count nearest to 174 BPM, and the flash + logo fall on the downbeat that opens the next phrase — the user asked for the logo to come in "rhythmically, on a phrase change". So the reel covers the same moment as the clip, but is **cut again from the 4K long video** — cropping a 9:16 window out of the 1080p clip would leave only 607 px of width to upscale.
 2. **Finding the DJ** (`track_dj`). The clip is decoded at `DETECT_FPS` (12) at 640×360 and run through torchvision's `fasterrcnn_mobilenet_v3_large_fpn` (COCO, score ≥ 0.4). The DJ is the biggest person box; its centre x and top y are kept as fractions of the frame. It finds the DJ in ~99% of frames, blackouts included; misses are interpolated. A first attempt that located the DJ as the darkest columns against the bright wall was dropped: the dark gaps between tubes pulled it ~10% to the left.
@@ -204,16 +204,16 @@ How the defaults were tuned, against the kapza reel and the user's feedback on s
 | v3 | y 0.7 s + outro | "still a bit static" |
 | v4 | y 0.4 s | "look at kapza's, it even has some tilt" |
 | v5 | y 0.3 s + tilt up to 3° | "goes super well" → the defaults |
-| — | `--bars 12` (11-vagrant c5) | reels should be 20–25 s and the logo should enter on a phrase change |
+| — | `--bars 12` (8-vagrant c5) | reels should be 20–25 s and the logo should enter on a phrase change |
 
 Not done yet (seen in the kapza reel): jump cuts every 1–2 s between moments, and segments mirrored horizontally (the "BOX" sign reads backwards).
 
 #### The outro (`assets/outro-dnbchile.mp4`)
 
-The last 2.92 s of `9-kapza/reel-promo.mp4`, from 17.2 s on: the clean half of CapCut's **Signal Glitch 2** transition, the DrumAndBassChile.cl logo on black, and the logo leaving with the **Black Hole** out animation (Mask section). 1080×1920, 23.976 fps, no audio. Everything before 17.2 s still shows the kapza footage, which is why the flash is rebuilt over our own clip instead. `assets/` is gitignored at the user's request (not pushed); rebuild it with:
+The last 2.92 s of `7-kapza/reel-promo.mp4`, from 17.2 s on: the clean half of CapCut's **Signal Glitch 2** transition, the DrumAndBassChile.cl logo on black, and the logo leaving with the **Black Hole** out animation (Mask section). 1080×1920, 23.976 fps, no audio. Everything before 17.2 s still shows the kapza footage, which is why the flash is rebuilt over our own clip instead. `assets/` is gitignored at the user's request (not pushed); rebuild it with:
 
 ```bash
-ffmpeg -ss 17.2 -i ".../el-sotano/9-kapza/reel-promo.mp4" -an \
+ffmpeg -ss 17.2 -i ".../el-sotano/7-kapza/reel-promo.mp4" -an \
   -vf "fps=24000/1001,format=yuv420p" -c:v h264_videotoolbox -b:v 14M assets/outro-dnbchile.mp4
 ```
 
@@ -244,23 +244,24 @@ The sets live in Google Drive at:
                         # (3840x2160, 23.976 fps, h264 yuv420p bt709, ~1 h, ~20 GB)
     C17xx.MP4           # raw camera recording (10-bit 4:2:2, no colour tags) -- not used
     REC_YYYYMMDD_N.wav  # raw audio recording -- not used
-    reel-promo.mp4      # the vertical promo reel (9-kapza's was hand-made in CapCut; newer ones by reel.py)
+    reel-promo.mp4      # the vertical promo reel (7-kapza's was hand-made in CapCut; newer ones by reel.py)
     carrusel/           # the clips for the Instagram carousel (1920x1080, c1..cN)
       repetidos/  descartados/  ranking.txt  .times.json   # written by rank.py
 ```
 
 State of the folders (Oct 2026):
-- `1-` to `9-` were done by hand before `rank.py` existed; their `carrusel/` holds the hand-picked clips. `5-mute/carrusel` is empty and its clips are in `carrusel-bkp/`.
-- `4-alan` has no `video-audio.mov`: its long video is `elsotano2.mov` (pass `--video elsotano2.mov` to rank.py/reel.py). Its carousel was regenerated with the full pipeline in Oct 2026 (41 drops, 15 kept); the old c1–c5 were CapCut exports and were deleted.
-- `10-saintcris` to `14-triggered` were produced with the full pipeline (35–52 drops each, 15 kept by `rank.py`). `10-saintcris/reel-promo.mp4` is c7 `--skip 5` (made before `--bars`, so ~22.7 s with the logo at the clip's end); `11-vagrant/reel-promo.mp4` is c5, `12-zaulo/reel-promo.mp4` c6 and `14-triggered/reel-promo.mp4` c5, all with the default `--bars 12`. `13-torcida/reel-promo.mp4` is not from a clip: it is the chorus of torcida's own track with Spanish vocals (vocals 59:09–60:07, found by transcribing the set with Whisper; the drop detector picked nothing there), cut with `--start 3577.38 --duration 22.528` — 16 bars from the chorus downbeat, so the logo enters as the next verse starts (25.4 s total). `12-zaulo/carrusel/intro.mp4` is cut by hand (not by the pipeline, not in `ranking.txt`): the custom El Sótano voiceover at the start of the set, 7.33–25.95 s, from the beat before the voice to the downbeat where the next section starts.
+- Folders are numbered in the order the sets were published (renamed Oct 2026): 1-robimess, 2-ciland, 3-jorbeat, 4-wilow, 5-bytuc, 6-mute, 7-kapza, 8-vagrant, 9-alan, 10-blacksoul, 11-zaulo, 12-torcida, 13-saintcris, 14-triggered. Older notes and commit messages use the previous numbers.
+- 1-robimess to 7-kapza and 10-blacksoul were done by hand before `rank.py` existed; their `carrusel/` holds the hand-picked clips. `6-mute/carrusel` is empty and its clips are in `carrusel-bkp/`.
+- `9-alan` has no `video-audio.mov`: its long video is `elsotano2.mov` (pass `--video elsotano2.mov` to rank.py/reel.py). Its carousel was regenerated with the full pipeline in Oct 2026 (41 drops, 15 kept); the old c1–c5 were CapCut exports and were deleted.
+- 8-vagrant, 11-zaulo, 12-torcida, 13-saintcris and 14-triggered were produced with the full pipeline (35–52 drops each, 15 kept by `rank.py`). In 9-alan, 12-torcida and 14-triggered the user then deleted clips by hand and the 10 best of `descartados/` were promoted as c16–c25 (by score, `ranking.txt` updated); re-running `rank.py` there would renumber them. `13-saintcris/reel-promo.mp4` is c7 `--skip 5` (made before `--bars`, so ~22.7 s with the logo at the clip's end); `8-vagrant/reel-promo.mp4` is c5, `11-zaulo/reel-promo.mp4` c6 and `14-triggered/reel-promo.mp4` c5, all with the default `--bars 12`. `12-torcida/reel-promo.mp4` is not from a clip: it is the chorus of torcida's own track with Spanish vocals (vocals 59:09–60:07, found by transcribing the set with Whisper; the drop detector picked nothing there), cut with `--start 3577.38 --duration 22.528` — 16 bars from the chorus downbeat, so the logo enters as the next verse starts (25.4 s total). `11-zaulo/carrusel/intro.mp4` is cut by hand (not by the pipeline, not in `ranking.txt`): the custom El Sótano voiceover at the start of the set, 7.33–25.95 s, from the beat before the voice to the downbeat where the next section starts.
 - `extras/` and `z-*` are not sets to process.
-- Colour: all `video-audio.mov` are DaVinci exports and carry a grade relative to the raw camera file, but 10–14 got a lighter one than the earlier sets (saturation ×1.4–1.7 vs ×1.9–2.3 for 6/9; 11-vagrant ×1.0), and every set has lifted blacks (2nd-percentile luma ~0.12).
+- Colour: all `video-audio.mov` are DaVinci exports and carry a grade relative to the raw camera file, but the pipeline sets (8, 11–14) got a lighter one than the earlier ones (saturation ×1.4–1.7 vs ×1.9–2.3 for 10-blacksoul and 7-kapza; 8-vagrant ×1.0), and every set has lifted blacks (2nd-percentile luma ~0.12).
 
 Per set, in order:
 
 ```bash
 cd /Users/matiasbn/drop-detector
-SET="/Users/matiasbn/Google Drive/My Drive/DNBCL (drive)/el-sotano/10-saintcris"
+SET="/Users/matiasbn/Google Drive/My Drive/DNBCL (drive)/el-sotano/13-saintcris"
 npm run clean                                    # input/ output/ downscaled/ must start empty
 ln -s "$SET/video-audio.mov" input/saintcris.mov # or cp; name it after the artist: it prefixes the clip names
 .venv/bin/python detect.py --mode set
