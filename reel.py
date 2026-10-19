@@ -151,6 +151,11 @@ def track_dj(detector, video: str, start: float, duration: float) -> tuple[np.nd
         capture_output=True, check=True,
     ).stdout
     frames = np.frombuffer(raw, np.uint8).reshape(-1, H, W, 3)
+    # A file Drive is still downloading can end the read early without an
+    # error; the camera would then freeze on the last position it saw.
+    if len(frames) < duration * DETECT_FPS - 2:
+        raise RuntimeError(f"only {len(frames)} of {int(duration * DETECT_FPS)} frames read "
+                           "(is the video fully downloaded from Drive?)")
 
     cx, top = [], []
     with torch.no_grad():
