@@ -16,6 +16,10 @@ Usage:
     python reel.py "<set folder>" descartados/47m52s     # any clip in ranking.txt
     python reel.py "<set folder>" --start 1159.9 --duration 24.7
     python reel.py "<set folder>" c7 --skip 5        # from second 5 of the clip
+    python reel.py "<set folder>" c7 --bars 8        # logo 8 bars after the drop
+
+A clip reel ends BARS (12) bars after the drop, on a phrase change, so it runs
+~22 s with the outro; --bars 0 keeps the whole clip (~27 s).
 
 Writes <set folder>/reel-<clip>.mp4. The clip is cut again from the 4K
 video-audio.mov, not upscaled from the 1080p carousel file.
@@ -43,6 +47,9 @@ HEAD_AT = 0.12     # Top of the DJ's box sits this far down the crop
 DETECT_FPS = 12    # Person detection rate; positions are interpolated between
 FLASH = 0.2        # Seconds of flash/blur/RGB split leading into the outro
 FADE = 1.0         # Audio fade-out at the very end (seconds)
+BARS = 12          # Bars after the drop before the logo comes in. Clips start
+                   # 2 bars before the drop, so 12 gives ~19 s of set + 2.9 s of
+                   # outro (~22 s); the logo lands on a 4-bar phrase change
 OUT_W, OUT_H = 1080, 1920
 BITRATE = "14M"
 
@@ -100,6 +107,20 @@ def clip_span(set_dir: str, clip: str) -> tuple[float, float]:
         starts = json.load(f)
     start = min(starts, key=lambda s: abs(s - approx))
     return start, probe(os.path.join(carrusel, name))["duration"]
+
+
+def phrase_cut(duration: float, bars: int) -> float:
+    """
+    How much of a carousel clip to keep so it ends `bars` bars after the drop.
+
+    Clips are bar-aligned (detect.py): they start BARS_BEFORE bars before the
+    drop and last a whole number of bars, so the bar length is the duration
+    over the bar count nearest to EXPECTED_BPM. Ending on a bar keeps the
+    flash and the logo on the beat.
+    """
+    from detect import BARS_BEFORE, BEATS_PER_BAR, EXPECTED_BPM
+    n = round(duration / (BEATS_PER_BAR * 60 / EXPECTED_BPM))
+    return min(duration, (BARS_BEFORE + bars) * duration / n)
 
 
 def load_detector():
@@ -243,7 +264,10 @@ def main():
     parser.add_argument("--duration", type=float, help="with --start (seconds)")
     parser.add_argument("--video", default="video-audio.mov", help="long video inside the folder")
     parser.add_argument("--skip", type=float, default=0.0,
-                        help="start this many seconds into the clip (it still ends where the clip ends)")
+                        help="start this many seconds into the clip (the end doesn't move)")
+    parser.add_argument("--bars", type=int, default=BARS,
+                        help=f"bars after the drop before the logo, default {BARS}; "
+                        "multiples of 4 land on a phrase change; 0 = whole clip")
     parser.add_argument("--zoom", type=float, default=ZOOM, help=f"default {ZOOM}")
     parser.add_argument("--follow-x", type=float, default=FOLLOW_X, help=f"seconds, default {FOLLOW_X}")
     parser.add_argument("--follow-y", type=float, default=FOLLOW_Y, help=f"seconds, default {FOLLOW_Y}")
@@ -258,7 +282,10 @@ def main():
             sys.exit("--start needs --duration")
         jobs = [(f"{int(opts.start)}s", lambda: (opts.start, opts.duration))]
     elif opts.clips:
-        jobs = [(c, lambda c=c: clip_span(opts.folder, c)) for c in opts.clips]
+        def span(c):
+            start, duration = clip_span(opts.folder, c)
+            return start, phrase_cut(duration, opts.bars) if opts.bars else duration
+        jobs = [(c, lambda c=c: span(c)) for c in opts.clips]
     else:
         sys.exit("Name at least one clip (e.g. c15) or pass --start/--duration")
     if opts.out and len(jobs) > 1:

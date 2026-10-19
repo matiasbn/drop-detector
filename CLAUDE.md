@@ -80,7 +80,8 @@ npm only forwards `--options` after a bare `--`; the direct call doesn't need it
 | `clips` (positional, 1+) | — | Clip names as they appear in `carrusel/ranking.txt`: `c7`, `c15`, `repetidos/47m52s`, `descartados/59m31s`. One reel per clip; a failing clip doesn't stop the rest. |
 | `--start S --duration S` | — | Cut by time (seconds into the long video) instead of by clip name. Doesn't need `ranking.txt`. |
 | `--video NAME` | `video-audio.mov` | The long video inside the folder. |
-| `--skip S` | `0` | Start S seconds into the clip; the reel still ends where the clip ends (so it's S seconds shorter). Refuses to leave under 5 s. |
+| `--skip S` | `0` | Start S seconds into the clip; the end doesn't move (so the reel is S seconds shorter). Refuses to leave under 5 s. |
+| `--bars N` | `12` (`BARS`) | Bars after the drop before the logo comes in. The cut ends on a bar, so with multiples of 4 the logo lands on a phrase change. 12 → ~19 s of set + 2.9 s outro ≈ 22 s; 8 → ≈ 16.5 s; `0` keeps the whole clip (≈ 27 s). Clip reels only, not `--start`. |
 | `--out PATH` | `<folder>/reel-<clip>.mp4` | Output path; single clip only. The approved finals are saved as `reel-promo.mp4`, the name used in 9-kapza. |
 | `--zoom Z` | `1.35` (`ZOOM`) | Crop height = source height / Z. Higher = tighter on the DJ. |
 | `--follow-x S` | `0.12` (`FOLLOW_X`) | Seconds of smoothing on the horizontal follow. Lower = snappier. |
@@ -186,9 +187,9 @@ Post-selection for a finished carousel (`<set folder>/carrusel/` next to the lon
 
 ### reel.py
 
-Makes a vertical reel from one carousel clip, modelled on the hand-edited `9-kapza/reel-promo.mp4` (made in CapCut). The output is 1080×1920 at the source frame rate (23.976), ~27.7 s for a standard clip (24.7 s + 2.9 s outro), h264_videotoolbox at 14 Mb/s, AAC 192k. One clip takes ~7 minutes on a busy machine (most of it decoding 4K twice).
+Makes a vertical reel from one carousel clip, modelled on the hand-edited `9-kapza/reel-promo.mp4` (made in CapCut). The output is 1080×1920 at the source frame rate (23.976), ~22 s by default (the user wants reels of 20–25 s), h264_videotoolbox at 14 Mb/s, AAC 192k. One clip takes ~7 minutes on a busy machine (most of it decoding 4K twice).
 
-1. **Which span.** `clip_span` looks the clip up in `carrusel/ranking.txt` (start rounded to the second), snaps to the nearest exact start in `carrusel/.times.json`, and takes the duration from the carousel file itself. So the reel covers exactly the same moment as the clip, but is **cut again from the 4K long video** — cropping a 9:16 window out of the 1080p clip would leave only 607 px of width to upscale.
+1. **Which span.** `clip_span` looks the clip up in `carrusel/ranking.txt` (start rounded to the second), snaps to the nearest exact start in `carrusel/.times.json`, and takes the duration from the carousel file itself. `phrase_cut` then shortens it to end `--bars` bars after the drop: clips are bar-aligned (start 2 bars before the drop, last a whole number of bars), so the bar length is the duration divided by the bar count nearest to 174 BPM, and the flash + logo fall on the downbeat that opens the next phrase — the user asked for the logo to come in "rhythmically, on a phrase change". So the reel covers the same moment as the clip, but is **cut again from the 4K long video** — cropping a 9:16 window out of the 1080p clip would leave only 607 px of width to upscale.
 2. **Finding the DJ** (`track_dj`). The clip is decoded at `DETECT_FPS` (12) at 640×360 and run through torchvision's `fasterrcnn_mobilenet_v3_large_fpn` (COCO, score ≥ 0.4). The DJ is the biggest person box; its centre x and top y are kept as fractions of the frame. It finds the DJ in ~99% of frames, blackouts included; misses are interpolated. A first attempt that located the DJ as the darkest columns against the bright wall was dropped: the dark gaps between tubes pulled it ~10% to the left.
 3. **The camera** (`camera_path`). A 3-frame median filter removes detector jumps, then a Gaussian of `FOLLOW_X` / `FOLLOW_Y` seconds is the camera's inertia. The crop is 9:16, `source height / ZOOM` tall (900×1600 of the 3840×2160 frame at 1.35), centred on the DJ horizontally and placed so the top of their box sits `HEAD_AT` (12%) down the crop. **Tilt:** the camera rolls toward the direction it is panning, proportional to horizontal speed (the fastest 5% of the clip reaches ~80% of `TILT`), smoothed over 0.3 s — what a handheld operator does. To rotate without black corners the crop is cut larger by `cos θ + 16/9·sin θ` (≈1.09 at 3°), rotated, then trimmed back.
 4. **Rendering** (`render`). ffmpeg's `sendcmd` feeds per-frame commands (`crop x`, `crop y`, `rotate a`) to a `crop → rotate → crop → scale` chain, so the whole moving camera is one ffmpeg pass over the 4K source. The `.cmd` file lives in a temp dir.
@@ -203,6 +204,7 @@ How the defaults were tuned, against the kapza reel and the user's feedback on s
 | v3 | y 0.7 s + outro | "still a bit static" |
 | v4 | y 0.4 s | "look at kapza's, it even has some tilt" |
 | v5 | y 0.3 s + tilt up to 3° | "goes super well" → the defaults |
+| — | `--bars 12` (11-vagrant c5) | reels should be 20–25 s and the logo should enter on a phrase change |
 
 Not done yet (seen in the kapza reel): jump cuts every 1–2 s between moments, and segments mirrored horizontally (the "BOX" sign reads backwards).
 
@@ -250,7 +252,7 @@ The sets live in Google Drive at:
 State of the folders (Oct 2026):
 - `1-` to `9-` were done by hand before `rank.py` existed; their `carrusel/` holds the hand-picked clips. `5-mute/carrusel` is empty and its clips are in `carrusel-bkp/`.
 - `4-alan` has no `video-audio.mov`: its long video is `elsotano2.mov` (pass `--video elsotano2.mov` to rank.py/reel.py). Its carousel was regenerated with the full pipeline in Oct 2026 (41 drops, 15 kept); the old c1–c5 were CapCut exports and were deleted.
-- `10-saintcris` to `14-triggered` were produced with the full pipeline (35–52 drops each, 15 kept by `rank.py`). No reels are kept there yet: the c7 reel and the c15 tuning iterations were deleted at the user's request.
+- `10-saintcris` to `14-triggered` were produced with the full pipeline (35–52 drops each, 15 kept by `rank.py`). `10-saintcris/reel-promo.mp4` is c7 `--skip 5` (made before `--bars`, so ~22.7 s with the logo at the clip's end); `11-vagrant/reel-promo.mp4` is c5 with the default `--bars 12`.
 - `extras/` and `z-*` are not sets to process.
 - Colour: all `video-audio.mov` are DaVinci exports and carry a grade relative to the raw camera file, but 10–14 got a lighter one than the earlier sets (saturation ×1.4–1.7 vs ×1.9–2.3 for 6/9; 11-vagrant ×1.0), and every set has lifted blacks (2nd-percentile luma ~0.12).
 
@@ -288,4 +290,4 @@ From the git log, in order — useful when a constant looks arbitrary:
 6. Interview mode: transcript + Claude instead of audio emphasis scoring; 30 moments, ranked best first; Whisper progress bar.
 7. Per-video/per-clip failure isolation; second pass removing drops closer than `MIN_DROP_DISTANCE` (adjacent groups produced near-duplicate clips).
 8. `rank.py`: light-show ranking, then the `repetidos/` split, then re-ranking with `--keep`/`--gap`, then `--video`.
-9. `reel.py`: follow-cam vertical reel with tilt and the DNB Chile outro, tuned over five versions against the kapza reel.
+9. `reel.py`: follow-cam vertical reel with tilt and the DNB Chile outro, tuned over five versions against the kapza reel; then `--skip`, and `--bars` to keep reels at 20–25 s with the logo on a phrase change.
