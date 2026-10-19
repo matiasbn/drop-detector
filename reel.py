@@ -282,10 +282,10 @@ def main():
             sys.exit("--start needs --duration")
         jobs = [(f"{int(opts.start)}s", lambda: (opts.start, opts.duration))]
     elif opts.clips:
-        def span(c):
+        def phrase_span(c):
             start, duration = clip_span(opts.folder, c)
             return start, phrase_cut(duration, opts.bars) if opts.bars else duration
-        jobs = [(c, lambda c=c: span(c)) for c in opts.clips]
+        jobs = [(c, lambda c=c: phrase_span(c)) for c in opts.clips]
     else:
         sys.exit("Name at least one clip (e.g. c15) or pass --start/--duration")
     if opts.out and len(jobs) > 1:
