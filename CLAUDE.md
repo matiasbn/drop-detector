@@ -19,6 +19,8 @@ Its main real-world use is the **El Sótano** sets of DNBCL (drum and bass, film
 
 Repository: https://github.com/matiasbn/drop-detector (private). Branch `main`, no CI.
 
+Location: since 2026-11-22 the project lives in the Drive at `DNBCL (drive)/drop-detector` (it was `~/drop-detector`). `.venv` is a symlink to `~/.venvs/drop-detector` so the 1.3 GB of torch never syncs to Drive; on another machine, create the venv there and recreate the symlink.
+
 ## Requirements and setup
 
 - **macOS on Apple Silicon.** Every encode uses `h264_videotoolbox`, and interview mode runs Whisper through `mlx-whisper` on the Apple GPU. Porting means swapping the codec (e.g. `libx264`) and the Whisper backend.
@@ -261,7 +263,7 @@ State of the folders (Oct 2026):
 Per set, in order:
 
 ```bash
-cd /Users/matiasbn/drop-detector
+cd "/Users/matiasbn/Google Drive/My Drive/DNBCL (drive)/drop-detector"
 SET="/Users/matiasbn/Google Drive/My Drive/DNBCL (drive)/el-sotano/12-saintcris"
 npm run clean                                    # input/ output/ downscaled/ must start empty
 ln -s "$SET/video-audio.mov" input/saintcris.mov # or cp; name it after the artist: it prefixes the clip names
